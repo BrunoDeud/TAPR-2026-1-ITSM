@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  AZURE_FUNCTIONAPP_NAME: 'azfunitsm'
+  AZURE_FUNCTIONAPP_NAME: 'azfunistsm'
   PYTHON_VERSION: '3.12'
 
 jobs:
