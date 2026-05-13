@@ -1,9 +1,16 @@
 import logging
 import azure.functions as func
-
+import os
 app = func.FunctionApp() 
  
 @app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def extract_chamada_status_historico(myTimer: func.TimerRequest) -> None:
     logging.info('tabela chamada_status_historico') 
+
+    sql_server = os.getenv("SQL_SERVER_SOURCE")
+    sql_database = os.getenv("SQL_DATABASE_SOURCE")
+    sql_user = os.getenv("SQL_USER_SOURCE")
+    sql_pass = os.getenv("SQL_PASSWORD_SOURCE")
+
+    logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')

@@ -1,5 +1,6 @@
 import logging
 import azure.functions as func
+import os
 
 app = func.FunctionApp()
 
@@ -7,3 +8,11 @@ app = func.FunctionApp()
               use_monitor=False) 
 def extract_chamado(myTimer: func.TimerRequest) -> None:
     logging.info('tabela chamado')
+
+
+    sql_server = os.getenv("SQL_SERVER_SOURCE")
+    sql_database = os.getenv("SQL_DATABASE_SOURCE")
+    sql_user = os.getenv("SQL_USER_SOURCE")
+    sql_pass = os.getenv("SQL_PASSWORD_SOURCE")
+
+    logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')
