@@ -1,6 +1,7 @@
 import logging
-import azure.functions as func
 import os
+import azure.functions as func
+import pyodbc
 
 app = func.Blueprint()
 
@@ -8,11 +9,43 @@ app = func.Blueprint()
               use_monitor=False) 
 def extract_chamado(myTimer: func.TimerRequest) -> None:
     logging.info('tabela chamado')
-
-
+    
     sql_server = os.getenv("SQL_SERVER_SOURCE")
     sql_database = os.getenv("SQL_DATABASE_SOURCE")
     sql_user = os.getenv("SQL_USER_SOURCE")
     sql_pass = os.getenv("SQL_PASSWORD_SOURCE")
 
-    logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')
+    logging.info(f'servidor={sql_server}, banco de dados={sql_database}, usuario={sql_user}, senha={sql_pass} ')
+
+    # Configura a string de conexão para o banco de dados SQL Server
+    conn_str = (
+        "DRIVER={ODBC Driver 18 for SQL Server};"
+        f"SERVER={sql_server};"
+        f"DATABASE={sql_database};"
+        f"UID={sql_user};"
+        f"PWD={sql_pass};"
+        "Encrypt=yes;"
+        "TrustServerCertificate=no;"
+        "Connection Timeout=30;"
+    )
+
+   
+    try:
+        # Estabelece a conexão com o banco de dados usando pyodbc
+        with pyodbc.connect(conn_str) as conn:
+            # Cria um cursor para executar a consulta   
+            cursor = conn.cursor()
+            
+            query = "select * from itsm.chamado"
+
+            # Executa a consulta SQL
+            cursor.execute(query)
+
+            # Busca todos os resultados da consulta
+            rows = cursor.fetchall()
+
+            logging.info(rows)           
+
+    except Exception as e:
+        logging.error(f"Erro ao ler itsm.chamado: {str(e)}")
+        raise
