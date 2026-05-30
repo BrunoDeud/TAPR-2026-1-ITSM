@@ -3,16 +3,16 @@ import azure.functions as func
 
 app = func.FunctionApp()
 
-from triggers.extract_analista import app as extract_analista
-from triggers.extract_categoria import app as extract_categoria
-from triggers.extract_chamado_sla import app as extract_chamado_sla
-from triggers.extract_chamada_status_historico import app as extract_chamada_status_historico
-from triggers.extract_chamado import app as extract_chamado
-from triggers.extract_cliente_organizacao import app as extract_cliente_organizacao
-from triggers.extract_csat_avaliacao import app as extract_csat_avaliacao
-from triggers.extract_fila import app as extract_fila
-from triggers.extract_sla import app as extract_sla
-from triggers.extract_solicitante import app as extract_solicitante
+from src.triggers.extract_analista import app as extract_analista
+from src.triggers.extract_categoria import app as extract_categoria
+from src.triggers.extract_chamado_sla import app as extract_chamado_sla
+from src.triggers.extract_chamada_status_historico import app as extract_chamada_status_historico
+from src.triggers.extract_chamado import app as extract_chamado
+from src.triggers.extract_cliente_organizacao import app as extract_cliente_organizacao
+from src.triggers.extract_csat_avaliacao import app as extract_csat_avaliacao
+from src.triggers.extract_fila import app as extract_fila
+from src.triggers.extract_sla import app as extract_sla
+from src.triggers.extract_solicitante import app as extract_solicitante
 
 app.register_functions(extract_analista)
 app.register_functions(extract_categoria)

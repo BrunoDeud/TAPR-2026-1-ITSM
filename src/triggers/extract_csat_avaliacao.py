@@ -44,7 +44,50 @@ def extract_csat_avaliacao(myTimer: func.TimerRequest) -> None:
             # Busca todos os resultados da consulta
             rows = cursor.fetchall()
 
-            logging.info(rows)           
+            logging.info(rows)       
+
+            # Puxar variáveis do banco de destino 
+            sql_server_tgt = os.getenv("SQL_SERVER_TARGET")
+            sql_database_tgt = os.getenv("SQL_DATABASE_TARGET")
+            sql_user_tgt = os.getenv("SQL_USER_TARGET")
+            sql_pass_tgt = os.getenv("SQL_PASSWORD_TARGET")
+
+            conn_str_tgt = (
+                "DRIVER={ODBC Driver 18 for SQL Server};"
+                f"SERVER={sql_server_tgt};"
+                f"DATABASE={sql_database_tgt};"
+                f"UID={sql_user_tgt};"  
+                f"PWD={sql_pass_tgt};"
+                "Encrypt=yes;"
+                "TrustServerCertificate=no;"
+                "Connection Timeout=30;"
+            )
+
+            if rows:
+                with pyodbc.connect(conn_str_tgt) as conn_tgt:
+                    cursor_tgt = conn_tgt.cursor()
+                    
+                    cursor_tgt.execute("DELETE FROM itsm.csat_avaliacao")
+                    
+                    # Permite inserir dados em colunas IDENTITY (IDs manuais)
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.csat_avaliacao  ON")
+                    
+                    # A tabela csat_avaliacao  tem 10 colunas
+                    query_insert = """
+                        INSERT INTO itsm.csat_avaliacao     
+                        (id_csat_avaliacao, id_chamado, id_analista, nr_score, ds_comentario, dt_avaliacao, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """
+                    
+                    # Inserção linha a linha
+                    for row in rows:
+                        cursor_tgt.execute(query_insert, *row)
+                    
+                    # Desabilita a inserção manual (Boas práticas de segurança)
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.csat_avaliacao OFF")
+                    
+                    # Salva as alterações
+                    conn_tgt.commit()
+                    logging.info("Tabela csat_avaliacao copiada com sucesso para o banco de destino!")       
 
     except Exception as e:
         logging.error(f"Erro ao ler itsm.csat_avaliacao: {str(e)}")

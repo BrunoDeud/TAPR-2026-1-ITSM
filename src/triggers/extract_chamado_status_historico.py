@@ -4,11 +4,11 @@ import os
 import pyodbc
 
 app = func.Blueprint()
-  
+ 
 @app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
-def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
-    logging.info('tabela cliente_organizacao')    
+def extract_chamado_status_historico(myTimer: func.TimerRequest) -> None:
+    logging.info('tabela chamado_status_historico') 
 
     sql_server = os.getenv("SQL_SERVER_SOURCE")
     sql_database = os.getenv("SQL_DATABASE_SOURCE")
@@ -36,7 +36,7 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
             # Cria um cursor para executar a consulta   
             cursor = conn.cursor()
             
-            query = "select top 10 * from itsm.cliente_organizacao"
+            query = "select top 10 * from itsm.chamado_status_historico"
 
             # Executa a consulta SQL
             cursor.execute(query)
@@ -44,8 +44,8 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
             # Busca todos os resultados da consulta
             rows = cursor.fetchall()
 
-            logging.info(rows) 
-            
+            logging.info(rows)   
+
             # Puxar variáveis do banco de destino 
             sql_server_tgt = os.getenv("SQL_SERVER_TARGET")
             sql_database_tgt = os.getenv("SQL_DATABASE_TARGET")
@@ -56,7 +56,7 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
                 "DRIVER={ODBC Driver 18 for SQL Server};"
                 f"SERVER={sql_server_tgt};"
                 f"DATABASE={sql_database_tgt};"
-                f"UID={sql_user_tgt};" 
+                f"UID={sql_user_tgt};"
                 f"PWD={sql_pass_tgt};"
                 "Encrypt=yes;"
                 "TrustServerCertificate=no;"
@@ -67,15 +67,16 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.cliente_organizacao   ")
+                    cursor_tgt.execute("DELETE FROM itsm.chamado_status_historico ")
                     
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.cliente_organizacao ON")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_status_historico  ON")
                     
-                    # A tabela cliente_organizacao tem 9 colunas
+                    # A tabela chamado_status_historico tem 12 colunas
                     query_insert = """
-                        INSERT INTO itsm.cliente_organizacao    
-                        (id_cliente_organizacao, cd_cliente_organizacao, nm_cliente_organizacao, nr_cnpj, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO itsm.chamado_status_historico  
+                        (id_chamado_status_historico, id_chamado, ds_status_chamado, dt_inicio_status, dt_fim_status, qt_tempo_status_minutos, id_analista_responsavel, id_fila, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """
                     
                     # Inserção linha a linha
@@ -83,12 +84,12 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
                         cursor_tgt.execute(query_insert, *row)
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.cliente_organizacao    OFF")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_status_historico  OFF")
                     
                     # Salva as alterações
                     conn_tgt.commit()
-                    logging.info("Tabela cliente_organizacao    copiada com sucesso para o banco de destino!")              
+                    logging.info("Tabela chamado_status_historico  copiada com sucesso para o banco de destino!")          
 
     except Exception as e:
-        logging.error(f"Erro ao ler itsm.cliente_organizacao: {str(e)}")
+        logging.error(f"Erro ao ler itsm.chamado_status_historico: {str(e)}")
         raise
