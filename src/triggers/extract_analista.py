@@ -38,7 +38,7 @@ def extract_analista(myTimer: func.TimerRequest) -> None:
             # Cria um cursor para executar a consulta   
             cursor = conn.cursor()
             
-            query = "select top 10 * from itsm.analista"
+            query = "select * from itsm.analista"
 
             # Executa a consulta SQL
             cursor.execute(query)

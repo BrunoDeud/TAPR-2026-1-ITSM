@@ -36,7 +36,7 @@ def extract_fila(myTimer: func.TimerRequest) -> None:
             # Cria um cursor para executar a consulta   
             cursor = conn.cursor()
             
-            query = "select top 10 * from itsm.fila"
+            query = "select * from itsm.fila"
 
             # Executa a consulta SQL
             cursor.execute(query)

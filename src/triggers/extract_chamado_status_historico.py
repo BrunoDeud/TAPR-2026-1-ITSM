@@ -36,7 +36,7 @@ def extract_chamado_status_historico(myTimer: func.TimerRequest) -> None:
             # Cria um cursor para executar a consulta   
             cursor = conn.cursor()
             
-            query = "select top 10 * from itsm.chamado_status_historico"
+            query = "select * from itsm.chamado_status_historico"
 
             # Executa a consulta SQL
             cursor.execute(query)

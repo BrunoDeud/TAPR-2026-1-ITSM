@@ -37,7 +37,7 @@ def extract_categoria(myTimer: func.TimerRequest) -> None:
             # Cria um cursor para executar a consulta   
             cursor = conn.cursor()
             
-            query = "select top 10 * from itsm.categoria"
+            query = "select * from itsm.categoria"
 
             # Executa a consulta SQL
             cursor.execute(query)

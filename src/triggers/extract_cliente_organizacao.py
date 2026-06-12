@@ -36,7 +36,7 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
             # Cria um cursor para executar a consulta   
             cursor = conn.cursor()
             
-            query = "select top 10 * from itsm.cliente_organizacao"
+            query = "select * from itsm.cliente_organizacao"
 
             # Executa a consulta SQL
             cursor.execute(query)

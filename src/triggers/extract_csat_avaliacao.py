@@ -36,7 +36,7 @@ def extract_csat_avaliacao(myTimer: func.TimerRequest) -> None:
             # Cria um cursor para executar a consulta   
             cursor = conn.cursor()
             
-            query = "select top 10 * from itsm.csat_avaliacao"
+            query = "select * from itsm.csat_avaliacao"
 
             # Executa a consulta SQL
             cursor.execute(query)

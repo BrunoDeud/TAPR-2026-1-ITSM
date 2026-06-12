@@ -37,7 +37,7 @@ def extract_chamado_sla(myTimer: func.TimerRequest) -> None:
             # Cria um cursor para executar a consulta   
             cursor = conn.cursor()
             
-            query = "select top 10 * from itsm.chamado_sla"
+            query = "select * from itsm.chamado_sla"
 
             # Executa a consulta SQL
             cursor.execute(query)
