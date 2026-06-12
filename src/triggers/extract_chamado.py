@@ -70,7 +70,7 @@ def extract_chamado(myTimer: func.TimerRequest) -> None:
                     cursor_tgt.execute("DELETE FROM itsm.chamado  ")
                     
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado   ON")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado OFF")
                     
                     # A tabela chamado   tem 19 colunas
                     query_insert = """
