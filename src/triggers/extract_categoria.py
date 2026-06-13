@@ -5,7 +5,6 @@ import pyodbc
 
 app = func.Blueprint()
 
- 
 @app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def extract_categoria(myTimer: func.TimerRequest) -> None:
@@ -30,7 +29,6 @@ def extract_categoria(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -68,29 +66,39 @@ def extract_categoria(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.categoria")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.categoria ON")
                     
                     # A tabela categoria tem 9 colunas
-                    query_insert = """
-                        INSERT INTO itsm.categoria 
-                        (id_categoria, cd_categoria, nm_categoria, ds_descricao , fl_ativo , dt_inclusao, dt_atualizacao , nm_sistema_origem , cd_registro_origem) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    query_merge = """
+                        MERGE INTO itsm.categoria AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_categoria, cd_categoria, nm_categoria, ds_descricao, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                        ON Target.id_categoria = Source.id_categoria
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                cd_categoria = Source.cd_categoria,
+                                nm_categoria = Source.nm_categoria,
+                                ds_descricao = Source.ds_descricao,
+                                fl_ativo = Source.fl_ativo,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_categoria, cd_categoria, nm_categoria, ds_descricao, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                            VALUES (Source.id_categoria, Source.cd_categoria, Source.nm_categoria, Source.ds_descricao, Source.fl_ativo, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.categoria OFF")
                     
                     # Salva as alterações
                     conn_tgt.commit()
-                    logging.info("Tabela categoria copiada com sucesso para o banco de destino!")     
-
+                    logging.info("Tabela categoria copiada com sucesso para o banco de destino!")    
 
     except Exception as e:
         logging.error(f"Erro ao ler itsm.categoria: {str(e)}")

@@ -4,7 +4,7 @@ import os
 import pyodbc
 
 app = func.Blueprint()
- 
+
 @app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def extract_chamado_status_historico(myTimer: func.TimerRequest) -> None:
@@ -17,7 +17,7 @@ def extract_chamado_status_historico(myTimer: func.TimerRequest) -> None:
 
     logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')
 
-        # Configura a string de conexão para o banco de dados SQL Server
+    # Configura a string de conexão para o banco de dados SQL Server
     conn_str = (
         "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={sql_server};"
@@ -29,7 +29,6 @@ def extract_chamado_status_historico(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -67,28 +66,42 @@ def extract_chamado_status_historico(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.chamado_status_historico ")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_status_historico  ON")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_status_historico ON")
                     
                     # A tabela chamado_status_historico tem 12 colunas
-                    query_insert = """
-                        INSERT INTO itsm.chamado_status_historico  
-                        (id_chamado_status_historico, id_chamado, ds_status_chamado, dt_inicio_status, dt_fim_status, qt_tempo_status_minutos, id_analista_responsavel, id_fila, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    query_merge = """
+                        MERGE INTO itsm.chamado_status_historico AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_chamado_status_historico, id_chamado, ds_status_chamado, dt_inicio_status, dt_fim_status, qt_tempo_status_minutos, id_analista_responsavel, id_fila, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
+                        ON Target.id_chamado_status_historico = Source.id_chamado_status_historico
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                id_chamado = Source.id_chamado,
+                                ds_status_chamado = Source.ds_status_chamado,
+                                dt_inicio_status = Source.dt_inicio_status,
+                                dt_fim_status = Source.dt_fim_status,
+                                qt_tempo_status_minutos = Source.qt_tempo_status_minutos,
+                                id_analista_responsavel = Source.id_analista_responsavel,
+                                id_fila = Source.id_fila,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_chamado_status_historico, id_chamado, ds_status_chamado, dt_inicio_status, dt_fim_status, qt_tempo_status_minutos, id_analista_responsavel, id_fila, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
+                            VALUES (Source.id_chamado_status_historico, Source.id_chamado, Source.ds_status_chamado, Source.dt_inicio_status, Source.dt_fim_status, Source.qt_tempo_status_minutos, Source.id_analista_responsavel, Source.id_fila, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_status_historico  OFF")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_status_historico OFF")
                     
                     # Salva as alterações
                     conn_tgt.commit()
-                    logging.info("Tabela chamado_status_historico  copiada com sucesso para o banco de destino!")          
+                    logging.info("Tabela chamado_status_historico copiada com sucesso para o banco de destino!")          
 
     except Exception as e:
         logging.error(f"Erro ao ler itsm.chamado_status_historico: {str(e)}")

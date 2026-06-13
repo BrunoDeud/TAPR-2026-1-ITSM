@@ -29,7 +29,6 @@ def extract_chamado(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -67,27 +66,49 @@ def extract_chamado(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.chamado  ")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado OFF")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado ON")
                     
-                    # A tabela chamado   tem 19 colunas
-                    query_insert = """
-                        INSERT INTO itsm.chamado   
-                        (id_chamado, nr_chamado, ds_tipo_chamado, ds_status_chamado, ds_prioridade, dt_criacao, dt_resolucao, dt_ultima_atualizacao, id_analista_atual, id_reporter, id_categoria, id_cliente_organizacao, id_fila_atual, ds_titulo, ds_descricao, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    # A tabela chamado tem 19 colunas
+                    query_merge = """
+                        MERGE INTO itsm.chamado AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_chamado, nr_chamado, ds_tipo_chamado, ds_status_chamado, ds_prioridade, dt_criacao, dt_resolucao, dt_ultima_atualizacao, id_analista_atual, id_reporter, id_categoria, id_cliente_organizacao, id_fila_atual, ds_titulo, ds_descricao, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                        ON Target.id_chamado = Source.id_chamado
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                nr_chamado = Source.nr_chamado,
+                                ds_tipo_chamado = Source.ds_tipo_chamado,
+                                ds_status_chamado = Source.ds_status_chamado,
+                                ds_prioridade = Source.ds_prioridade,
+                                dt_criacao = Source.dt_criacao,
+                                dt_resolucao = Source.dt_resolucao,
+                                dt_ultima_atualizacao = Source.dt_ultima_atualizacao,
+                                id_analista_atual = Source.id_analista_atual,
+                                id_reporter = Source.id_reporter,
+                                id_categoria = Source.id_categoria,
+                                id_cliente_organizacao = Source.id_cliente_organizacao,
+                                id_fila_atual = Source.id_fila_atual,
+                                ds_titulo = Source.ds_titulo,
+                                ds_descricao = Source.ds_descricao,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_chamado, nr_chamado, ds_tipo_chamado, ds_status_chamado, ds_prioridade, dt_criacao, dt_resolucao, dt_ultima_atualizacao, id_analista_atual, id_reporter, id_categoria, id_cliente_organizacao, id_fila_atual, ds_titulo, ds_descricao, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
+                            VALUES (Source.id_chamado, Source.nr_chamado, Source.ds_tipo_chamado, Source.ds_status_chamado, Source.ds_prioridade, Source.dt_criacao, Source.dt_resolucao, Source.dt_ultima_atualizacao, Source.id_analista_atual, Source.id_reporter, Source.id_categoria, Source.id_cliente_organizacao, Source.id_fila_atual, Source.ds_titulo, Source.ds_descricao, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado   OFF")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado OFF")
                     
                     # Salva as alterações
                     conn_tgt.commit()
-                    logging.info("Tabela chamado   copiada com sucesso para o banco de destino!")                     
+                    logging.info("Tabela chamado copiada com sucesso para o banco de destino!")                     
 
     except Exception as e:
         logging.error(f"Erro ao ler itsm.chamado: {str(e)}")

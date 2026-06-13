@@ -17,7 +17,7 @@ def extract_solicitante(myTimer: func.TimerRequest) -> None:
 
     logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')
 
-        # Configura a string de conexão para o banco de dados SQL Server
+    # Configura a string de conexão para o banco de dados SQL Server
     conn_str = (
         "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={sql_server};"
@@ -29,7 +29,6 @@ def extract_solicitante(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -67,20 +66,34 @@ def extract_solicitante(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.solicitante")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.solicitante ON")
                     
-                    # A tabela solicitante  tem 11 colunas
-                    query_insert = """
-                        INSERT INTO itsm.solicitante     
-                        (id_solicitante, cd_solicitante, id_cliente_organizacao, nm_solicitante, ds_email, ds_telefone, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    # A tabela solicitante tem 11 colunas
+                    query_merge = """
+                        MERGE INTO itsm.solicitante AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_solicitante, cd_solicitante, id_cliente_organizacao, nm_solicitante, ds_email, ds_telefone, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                        ON Target.id_solicitante = Source.id_solicitante
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                cd_solicitante = Source.cd_solicitante,
+                                id_cliente_organizacao = Source.id_cliente_organizacao,
+                                nm_solicitante = Source.nm_solicitante,
+                                ds_email = Source.ds_email,
+                                ds_telefone = Source.ds_telefone,
+                                fl_ativo = Source.fl_ativo,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_solicitante, cd_solicitante, id_cliente_organizacao, nm_solicitante, ds_email, ds_telefone, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
+                            VALUES (Source.id_solicitante, Source.cd_solicitante, Source.id_cliente_organizacao, Source.nm_solicitante, Source.ds_email, Source.ds_telefone, Source.fl_ativo, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.solicitante OFF")

@@ -17,7 +17,7 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
 
     logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')
 
-        # Configura a string de conexão para o banco de dados SQL Server
+    # Configura a string de conexão para o banco de dados SQL Server
     conn_str = (
         "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={sql_server};"
@@ -29,7 +29,6 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -67,27 +66,39 @@ def extract_cliente_organizacao(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.cliente_organizacao   ")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.cliente_organizacao ON")
                     
                     # A tabela cliente_organizacao tem 9 colunas
-                    query_insert = """
-                        INSERT INTO itsm.cliente_organizacao    
-                        (id_cliente_organizacao, cd_cliente_organizacao, nm_cliente_organizacao, nr_cnpj, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    query_merge = """
+                        MERGE INTO itsm.cliente_organizacao AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_cliente_organizacao, cd_cliente_organizacao, nm_cliente_organizacao, nr_cnpj, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                        ON Target.id_cliente_organizacao = Source.id_cliente_organizacao
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                cd_cliente_organizacao = Source.cd_cliente_organizacao,
+                                nm_cliente_organizacao = Source.nm_cliente_organizacao,
+                                nr_cnpj = Source.nr_cnpj,
+                                fl_ativo = Source.fl_ativo,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_cliente_organizacao, cd_cliente_organizacao, nm_cliente_organizacao, nr_cnpj, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
+                            VALUES (Source.id_cliente_organizacao, Source.cd_cliente_organizacao, Source.nm_cliente_organizacao, Source.nr_cnpj, Source.fl_ativo, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.cliente_organizacao    OFF")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.cliente_organizacao OFF")
                     
                     # Salva as alterações
                     conn_tgt.commit()
-                    logging.info("Tabela cliente_organizacao    copiada com sucesso para o banco de destino!")              
+                    logging.info("Tabela cliente_organizacao copiada com sucesso para o banco de destino!")               
 
     except Exception as e:
         logging.error(f"Erro ao ler itsm.cliente_organizacao: {str(e)}")

@@ -29,7 +29,6 @@ def extract_fila(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -67,20 +66,32 @@ def extract_fila(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.fila")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.fila  ON")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.fila ON")
                     
-                    # A tabela fila  tem 9 colunas
-                    query_insert = """
-                        INSERT INTO itsm.fila     
-                        (id_fila, cd_fila, nm_fila, ds_descricao, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    # A tabela fila tem 9 colunas
+                    query_merge = """
+                        MERGE INTO itsm.fila AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_fila, cd_fila, nm_fila, ds_descricao, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                        ON Target.id_fila = Source.id_fila
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                cd_fila = Source.cd_fila,
+                                nm_fila = Source.nm_fila,
+                                ds_descricao = Source.ds_descricao,
+                                fl_ativo = Source.fl_ativo,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_fila, cd_fila, nm_fila, ds_descricao, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
+                            VALUES (Source.id_fila, Source.cd_fila, Source.nm_fila, Source.ds_descricao, Source.fl_ativo, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.fila OFF")

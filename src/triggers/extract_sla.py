@@ -17,7 +17,7 @@ def extract_sla(myTimer: func.TimerRequest) -> None:
 
     logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')
 
-        # Configura a string de conexão para o banco de dados SQL Server
+    # Configura a string de conexão para o banco de dados SQL Server
     conn_str = (
         "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={sql_server};"
@@ -29,7 +29,6 @@ def extract_sla(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -67,20 +66,33 @@ def extract_sla(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.sla")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.sla ON")
                     
-                    # A tabela sla  tem 10 colunas
-                    query_insert = """
-                        INSERT INTO itsm.sla     
-                        (id_sla, cd_sla, nm_sla, qt_meta_minutos, ds_descricao, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    # A tabela sla tem 10 colunas
+                    query_merge = """
+                        MERGE INTO itsm.sla AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_sla, cd_sla, nm_sla, qt_meta_minutos, ds_descricao, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                        ON Target.id_sla = Source.id_sla
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                cd_sla = Source.cd_sla,
+                                nm_sla = Source.nm_sla,
+                                qt_meta_minutos = Source.qt_meta_minutos,
+                                ds_descricao = Source.ds_descricao,
+                                fl_ativo = Source.fl_ativo,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_sla, cd_sla, nm_sla, qt_meta_minutos, ds_descricao, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
+                            VALUES (Source.id_sla, Source.cd_sla, Source.nm_sla, Source.qt_meta_minutos, Source.ds_descricao, Source.fl_ativo, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.sla OFF")

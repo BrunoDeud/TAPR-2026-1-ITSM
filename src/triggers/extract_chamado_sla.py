@@ -3,7 +3,6 @@ import os
 import azure.functions as func
 import pyodbc
 
-
 app = func.Blueprint()
 
 @app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=False,
@@ -18,7 +17,7 @@ def extract_chamado_sla(myTimer: func.TimerRequest) -> None:
 
     logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')
 
-        # Configura a string de conexão para o banco de dados SQL Server
+    # Configura a string de conexão para o banco de dados SQL Server
     conn_str = (
         "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={sql_server};"
@@ -30,7 +29,6 @@ def extract_chamado_sla(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -47,7 +45,7 @@ def extract_chamado_sla(myTimer: func.TimerRequest) -> None:
 
             logging.info(rows)  
 
-                # Puxar variáveis do banco de destino 
+            # Puxar variáveis do banco de destino 
             sql_server_tgt = os.getenv("SQL_SERVER_TARGET")
             sql_database_tgt = os.getenv("SQL_DATABASE_TARGET")
             sql_user_tgt = os.getenv("SQL_USER_TARGET")
@@ -68,27 +66,42 @@ def extract_chamado_sla(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.chamado_sla ")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_sla  ON")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_sla ON")
                     
-                    # A tabela chamado_sla  tem 12 colunas
-                    query_insert = """
-                        INSERT INTO itsm.chamado_sla  
-                        (id_chamado_sla, id_chamado, id_sla, fl_breach, qt_tempo_restante_minutos, qt_tempo_decorrido_minutos, qt_meta_minutos, dt_referencia, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    # A tabela chamado_sla tem 12 colunas
+                    query_merge = """
+                        MERGE INTO itsm.chamado_sla AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_chamado_sla, id_chamado, id_sla, fl_breach, qt_tempo_restante_minutos, qt_tempo_decorrido_minutos, qt_meta_minutos, dt_referencia, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                        ON Target.id_chamado_sla = Source.id_chamado_sla
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                id_chamado = Source.id_chamado,
+                                id_sla = Source.id_sla,
+                                fl_breach = Source.fl_breach,
+                                qt_tempo_restante_minutos = Source.qt_tempo_restante_minutos,
+                                qt_tempo_decorrido_minutos = Source.qt_tempo_decorrido_minutos,
+                                qt_meta_minutos = Source.qt_meta_minutos,
+                                dt_referencia = Source.dt_referencia,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_chamado_sla, id_chamado, id_sla, fl_breach, qt_tempo_restante_minutos, qt_tempo_decorrido_minutos, qt_meta_minutos, dt_referencia, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                            VALUES (Source.id_chamado_sla, Source.id_chamado, Source.id_sla, Source.fl_breach, Source.qt_tempo_restante_minutos, Source.qt_tempo_decorrido_minutos, Source.qt_meta_minutos, Source.dt_referencia, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
-                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_sla  OFF")
+                    cursor_tgt.execute("SET IDENTITY_INSERT itsm.chamado_sla OFF")
                     
                     # Salva as alterações
                     conn_tgt.commit()
-                    logging.info("Tabela chamado_sla  copiada com sucesso para o banco de destino!")              
+                    logging.info("Tabela chamado_sla copiada com sucesso para o banco de destino!")               
 
     except Exception as e:
         logging.error(f"Erro ao ler itsm.chamado_sla: {str(e)}")

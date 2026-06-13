@@ -4,13 +4,11 @@ import os
 import pyodbc 
 
 app = func.Blueprint()
- 
 
 @app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def extract_analista(myTimer: func.TimerRequest) -> None:
     logging.info('tabela analista')  
-
 
     sql_server = os.getenv("SQL_SERVER_SOURCE")
     sql_database = os.getenv("SQL_DATABASE_SOURCE")
@@ -19,7 +17,7 @@ def extract_analista(myTimer: func.TimerRequest) -> None:
 
     logging.info(f'Servidor: {sql_server}, Banco: {sql_database} , User: {sql_user}, Senha: {sql_pass}')
 
-        # Configura a string de conexão para o banco de dados SQL Server
+    # Configura a string de conexão para o banco de dados SQL Server
     conn_str = (
         "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={sql_server};"
@@ -31,7 +29,6 @@ def extract_analista(myTimer: func.TimerRequest) -> None:
         "Connection Timeout=30;"
     )
 
-   
     try:
         # Estabelece a conexão com o banco de dados usando pyodbc
         with pyodbc.connect(conn_str) as conn:
@@ -69,21 +66,34 @@ def extract_analista(myTimer: func.TimerRequest) -> None:
                 with pyodbc.connect(conn_str_tgt) as conn_tgt:
                     cursor_tgt = conn_tgt.cursor()
                     
-                    cursor_tgt.execute("DELETE FROM itsm.analista")
-                    
                     # Permite inserir dados em colunas IDENTITY (IDs manuais)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.analista ON")
                     
                     # A tabela analista tem 11 colunas, então precisamos de 11 pontos de interrogação (?)
-                    query_insert = """
-                        INSERT INTO itsm.analista 
-                        (id_analista, cd_analista, nm_analista, ds_email, ds_nivel, id_fila_atual, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    query_merge = """
+                        MERGE INTO itsm.analista AS Target
+                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+                            AS Source (id_analista, cd_analista, nm_analista, ds_email, ds_nivel, id_fila_atual, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                        ON Target.id_analista = Source.id_analista
+                        WHEN MATCHED THEN
+                            UPDATE SET 
+                                cd_analista = Source.cd_analista,
+                                nm_analista = Source.nm_analista,
+                                ds_email = Source.ds_email,
+                                ds_nivel = Source.ds_nivel,
+                                id_fila_atual = Source.id_fila_atual,
+                                fl_ativo = Source.fl_ativo,
+                                dt_inclusao = Source.dt_inclusao,
+                                dt_atualizacao = Source.dt_atualizacao,
+                                nm_sistema_origem = Source.nm_sistema_origem,
+                                cd_registro_origem = Source.cd_registro_origem
+                        WHEN NOT MATCHED BY TARGET THEN
+                            INSERT (id_analista, cd_analista, nm_analista, ds_email, ds_nivel, id_fila_atual, fl_ativo, dt_inclusao, dt_atualizacao, nm_sistema_origem, cd_registro_origem)
+                            VALUES (Source.id_analista, Source.cd_analista, Source.nm_analista, Source.ds_email, Source.ds_nivel, Source.id_fila_atual, Source.fl_ativo, Source.dt_inclusao, Source.dt_atualizacao, Source.nm_sistema_origem, Source.cd_registro_origem);
                     """
                     
                     # Inserção linha a linha
-                    for row in rows:
-                        cursor_tgt.execute(query_insert, *row)
+                    cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
                     # Desabilita a inserção manual (Boas práticas de segurança)
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.analista OFF")
