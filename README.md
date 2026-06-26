@@ -6,6 +6,7 @@
 
 ## PowerBI
 
-![PowerBI](docs/Bi1.png)
+![PowerBI](docs/Qualidade.png)
 
-![PowerBI](docs/Bi2.png)
+![PowerBI](docs/Chamados.png)
+

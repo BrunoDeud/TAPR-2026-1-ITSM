@@ -95,7 +95,7 @@ def extract_analista(myTimer: func.TimerRequest) -> None:
                     # Inserção linha a linha
                     cursor_tgt.executemany(query_merge, [tuple(row) for row in rows])
                     
-                    # Desabilita a inserção manual (Boas práticas de segurança)
+                    # Desabilita a inserção manual 
                     cursor_tgt.execute("SET IDENTITY_INSERT itsm.analista OFF")
                     
                     # Salva as alterações
