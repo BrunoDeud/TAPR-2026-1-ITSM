@@ -3,10 +3,12 @@ import logging
 import os
 import pyodbc 
 
+# Assinatura da função execute_sync_template para ser usada em outros módulos
 def execute_sync_template(table_name: str, pk_column: str, columns: list) -> None:
     # Template Method para extrair dados da origem e fazer o MERGE no destino.
     logging.info(f'Iniciando processamento da tabela {table_name}')  
 
+    # Monta a string de conexão para o banco de dados de origuem
     sql_server = os.getenv("SQL_SERVER_SOURCE")
     sql_database = os.getenv("SQL_DATABASE_SOURCE")
     sql_user = os.getenv("SQL_USER_SOURCE")
@@ -23,6 +25,7 @@ def execute_sync_template(table_name: str, pk_column: str, columns: list) -> Non
         "Connection Timeout=30;"
     )
 
+    # Monta a string de conexão para o banco de dados de destino
     sql_server_tgt = os.getenv("SQL_SERVER_TARGET")
     sql_database_tgt = os.getenv("SQL_DATABASE_TARGET")
     sql_user_tgt = os.getenv("SQL_USER_TARGET")
@@ -39,6 +42,7 @@ def execute_sync_template(table_name: str, pk_column: str, columns: list) -> Non
         "Connection Timeout=30;"
     )
 
+    # Executa a extração de dados das tabelas de origem e faz um MERGE no banco de dados de destino
     try:
         with pyodbc.connect(conn_str_src) as conn:
             cursor = conn.cursor()
